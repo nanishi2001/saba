@@ -111,6 +111,7 @@ impl Url {
 mod tests {
 	use super::*;
 
+	// 成功時のテスト
 	#[test]
 	fn test_url_host() {
 		let url = "http://example.com".to_string();
@@ -176,6 +177,7 @@ mod tests {
 		assert_eq!(expected, Url::new(url).parse());
 	}
 
+	// エラー時のテスト
 	#[test]
 	fn test_no_scheme() {
 		let url = "example.com".to_string();

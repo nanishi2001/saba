@@ -40,6 +40,7 @@ impl Url {
 		// Result型に即した返値を返す
 		return Ok(self.clone());
 	}
+
 	// URLのスキーマがHTTPかどうかを判定(今回の実装ではHTTPのみがスコープ)
 	fn is_http(&mut self) -> bool {
 		if self.url.contains("http://") {
@@ -47,6 +48,7 @@ impl Url {
 		}
 		return false;	// Rustの機能で明示的にreturnを書かなくても関数の最終行が返値になるが書いたほうがわかりやすいので記載
 	}
+
 	// URLからhostを取得するメソッド
 	fn extract_host(&self) -> String {
 		// 先頭からhttp://までを取り除き、2つめの / まで分割した配列を作成
@@ -90,5 +92,19 @@ impl Url {
 		} else {
 			return path_and_serchpart[1].to_string();
 		}
+	}
+
+	// ゲッターメソッド
+	pub fn host(&self) -> String {
+		return self.host.clone();
+	}
+	pub fn port(&self) -> String {
+		return self.port.clone();
+	}
+	pub fn path(&self) -> String {
+		return self.path.clone();
+	}
+	pub fn searchpart(&self) -> String {
+		return self.searchpart.clone();
 	}
 }

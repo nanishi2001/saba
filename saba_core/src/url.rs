@@ -29,7 +29,7 @@ impl Url {
 			return Err("Only HTTP scheme is supported.".to_string());
 		}
 
-		// url以外のプロパティを抽出
+		// url以外のフィールドを抽出
 		self.host = self.extract_host();
 		self.port = self.extract_port();
 		self.path = self.extract_path();

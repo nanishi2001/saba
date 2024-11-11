@@ -1,5 +1,4 @@
 #![no_std]
 
 extern crate alloc;
-
-pub  mod  url;
+pub mod url;

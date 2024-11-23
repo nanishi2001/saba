@@ -1,6 +1,6 @@
 use alloc::string::String;
 use alloc::vec::Vec;
-use crate::renderer::html::attribute::{self, Attribute};
+use crate::renderer::html::attribute::Attribute;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 // トークンの列挙型
@@ -86,12 +86,10 @@ impl HtmlTokenizer {
             self.latest_token = Some(HtmlToken::StartTag { 
                 tag: String::new(),
                 self_closing: false,
-                attributes:Vec::new()
+                attributes: Vec::new(),
             });
         } else {
-            self.latest_token = Some(HtmlToken::EndTag { 
-                tag: String::new()
-            });
+            self.latest_token = Some(HtmlToken::EndTag { tag: String::new() });
         }
     }
     // latest_tokenの末尾に文字を追加する
@@ -99,8 +97,8 @@ impl HtmlTokenizer {
         assert!(self.latest_token.is_some());
         if let Some(t) = self.latest_token.as_mut() {
             match t {
-                HtmlToken::StartTag { tag: ref mut tag, self_closing: _, attributes: _,}
-                | HtmlToken::EndTag { tag: ref mut tag } 
+                HtmlToken::StartTag { ref mut tag, self_closing: _, attributes: _,}
+                | HtmlToken::EndTag { ref mut tag } 
                     => tag.push(c),
                 _ => panic!("`latest_token` should be either StartTag or EndTag"),
             }
@@ -113,6 +111,7 @@ impl HtmlTokenizer {
         let t = self.latest_token.as_ref().cloned();
         self.latest_token = None;
         assert!(self.latest_token.is_none());
+        return t;
     }
     // latest_tokenにAttributeを追加する
     fn start_new_attribute(&mut self) {
@@ -120,7 +119,7 @@ impl HtmlTokenizer {
 
         if let Some(t) = self.latest_token.as_mut() {
             match t {
-                HtmlToken::StartTag { tag: _, self_closing: _, attributes: ref mut attributes} 
+                HtmlToken::StartTag { tag: _, self_closing: _, ref mut attributes} 
                     => {
                         attributes.push(Attribute::new());
                     }
@@ -129,12 +128,12 @@ impl HtmlTokenizer {
         }
     }
     // latest_tokenに属性文字を追加する
-    fn append_attribute(&mut self, c:char, is_name:bool) {
+    fn append_attribute(&mut self, c: char, is_name: bool) {
         assert!(self.latest_token.is_some());
 
         if let Some(t) = self.latest_token.as_mut() {
             match t {
-                HtmlToken::StartTag { tag: _, self_closing: _, attributes: ref mut attributes }
+                HtmlToken::StartTag { tag: _, self_closing: _, ref mut attributes }
                     => {
                         let len = attributes.len();
                         assert!(len > 0);
@@ -150,7 +149,7 @@ impl HtmlTokenizer {
 
         if let Some(t) = self.latest_token.as_mut() {
             match t {
-                HtmlToken::StartTag { tag: _, self_closing: ref mut self_closing, attributes: _ }
+                HtmlToken::StartTag { tag: _, ref mut self_closing, attributes: _ }
                     => *self_closing = true,
                 _ => panic!("`latest_token` should be either StartTag"),
             }
@@ -193,7 +192,7 @@ impl Iterator for HtmlTokenizer {
                         continue;
                     }
                     // 文字がアルファベットで場合、TagName状態に遷移
-                    if self.is_ascii_alphabetic() {
+                    if c.is_ascii_alphabetic() {
                         self.reconsume = true;
                         self.state = State::TagName;
                         self.create_tag(true);
@@ -205,7 +204,7 @@ impl Iterator for HtmlTokenizer {
                     }
                     // 上記以外の場合、Data状態に遷移しもう一度判定する
                     self.reconsume = true;
-                    self.state = state::Data;
+                    self.state = State::Data;
                 }
                 State::EndTagOpen => {
                     // 最後の文字の場合、Eofトークンを返す
@@ -219,9 +218,6 @@ impl Iterator for HtmlTokenizer {
                         self.create_tag(false);
                         continue;
                     }
-                    // 上記以外の場合、Data状態に遷移しもう一度判定する
-                    self.reconsume = true;
-                    self.state = State::Data;
                 }
                 State::TagName => {
                     // スペースの場合、BeforeAttributeName状態に遷移
@@ -256,7 +252,7 @@ impl Iterator for HtmlTokenizer {
                     if c == '/' || c == '>' || self.is_eof() {
                         self.reconsume = true;
                         self.state = State::AfterAttributeName;
-                        continue;;
+                        continue;
                     }
                     // それ以外の場合、AfterAttributeName状態に遷移し、start_new_attributeメソッドを呼びだす
                     self.reconsume = true;
@@ -364,7 +360,7 @@ impl Iterator for HtmlTokenizer {
                     }
                     if c == '>' {
                         self.state = State::Data;
-                        continue;
+                        return self.take_latest_token();
                     }
                     if self.is_eof() {
                         return Some(HtmlToken::Eof);
@@ -383,7 +379,7 @@ impl Iterator for HtmlTokenizer {
                     }
                     if c == '>' {
                         self.state = State::Data;
-                        continue;
+                        return self.take_latest_token();
                     }
                     if self.is_eof() {
                         return Some(HtmlToken::Eof);
@@ -462,6 +458,108 @@ impl Iterator for HtmlTokenizer {
                     return Some(HtmlToken::Char(c));
                 }
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::alloc::string::ToString;
+    use alloc::vec;
+
+    // 空の場合
+    #[test]
+    fn test_empty() {
+        let html = "".to_string();
+        let mut tokenizer = HtmlTokenizer::new(html);
+        assert!(tokenizer.next().is_none());
+    }
+
+    // bodyが開始タグと終了タグの場合
+    #[test]
+    fn test_start_and_end_tag() {
+        let html = "<body></body>".to_string();
+        let mut tokenizer = HtmlTokenizer::new(html);
+        let expected = [
+            HtmlToken::StartTag { tag: "body".to_string(), self_closing: false, attributes: Vec::new() },
+            HtmlToken::EndTag { tag: "body".to_string() },
+        ];
+        for e in expected {
+            assert_eq!(Some(e), tokenizer.next());
+        }
+    }
+
+    // pタグがclassとidとfoo属性を持つ場合
+    #[test]
+    fn test_attributes() {
+        let html = "<p class=\"A\" id='B' foo=bar></p>".to_string();
+        let mut tokenizer = HtmlTokenizer::new(html);
+
+        // classに対するAttributeを追加
+        let mut attr1 = Attribute::new();
+        attr1.add_char('c', true);
+        attr1.add_char('l', true);
+        attr1.add_char('a', true);
+        attr1.add_char('s', true);
+        attr1.add_char('s', true);
+        attr1.add_char('A', false);
+        // idに対するAttributeを追加
+        let mut attr2 = Attribute::new();
+        attr2.add_char('i', true);
+        attr2.add_char('d', true);
+        attr2.add_char('B', false);
+        // foo属性に対するAttributeを追加
+        let mut attr3 = Attribute::new();
+        attr3.add_char('f', true);
+        attr3.add_char('o', true);
+        attr3.add_char('o', true);
+        attr3.add_char('b', false);
+        attr3.add_char('a', false);
+        attr3.add_char('r', false);
+        
+        let expected = [
+            HtmlToken::StartTag { tag: "p".to_string(), self_closing: false, attributes: vec![attr1, attr2, attr3] },
+            HtmlToken::EndTag { tag: "p".to_string() }
+        ];
+
+        for e in expected {
+            assert_eq!(Some(e), tokenizer.next());
+        }
+    }
+
+    // 空要素タグのテスト
+    #[test]
+    fn test_self_closing_tag() {
+        let html = "<img />".to_string();
+        let mut tokenizer = HtmlTokenizer::new(html);
+        let expected = [
+            HtmlToken::StartTag { tag: "img".to_string(), self_closing: true, attributes: Vec::new() }
+        ];
+        for e in expected {
+            assert_eq!(Some(e), tokenizer.next());
+        }
+    }
+
+    // スクリプトタグのテスト
+    #[test]
+    fn test_script_tag() {
+        let html = "<script>js code;</script>".to_string();
+        let mut tokenizer = HtmlTokenizer::new(html);
+        let expected = [
+            HtmlToken::StartTag { tag: "script".to_string(), self_closing: false, attributes: Vec::new() },
+            HtmlToken::Char('j'),
+            HtmlToken::Char('s'),
+            HtmlToken::Char(' '),
+            HtmlToken::Char('c'),
+            HtmlToken::Char('o'),
+            HtmlToken::Char('d'),
+            HtmlToken::Char('e'),
+            HtmlToken::Char(';'),
+            HtmlToken::EndTag { tag: "script".to_string() },
+        ];
+        for e in expected {
+            assert_eq!(Some(e), tokenizer.next());
         }
     }
 }
